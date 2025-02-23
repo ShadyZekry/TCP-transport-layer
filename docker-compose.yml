@@ -1,0 +1,12 @@
+services:
+  server:
+    image: golang:latest
+    working_dir: /app
+    user: "1000:1000"
+    command: ["go", "run", "main.go"]
+    environment:
+      GOCACHE: "/go/.cache"
+    volumes:
+      - .:/app
+    ports:
+      - 8080:8080
