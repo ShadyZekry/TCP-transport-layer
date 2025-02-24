@@ -5,15 +5,22 @@ import (
 	"net"
 )
 
+type Message struct {
+	from string
+	msg  string
+}
+
 type Server struct {
 	ListenAddr string
 	ln         net.Listener
+	messages   chan Message
 	closeChan  chan struct{}
 }
 
 func NewServer(listenAddr string) *Server {
 	return &Server{
 		ListenAddr: listenAddr,
+		messages:   make(chan Message),
 		closeChan:  make(chan struct{}),
 	}
 }
@@ -28,9 +35,14 @@ func (s *Server) Serve() error {
 	defer ln.Close()
 	s.ln = ln
 
-	s.AcceptConnections()
+	go s.AcceptConnections()
+	for {
+		msg := <-s.messages
+		fmt.Println("from: ", msg.from, " msg: ", msg.msg)
+	}
 
 	<-s.closeChan
+	close(s.closeChan)
 	return nil
 }
 
@@ -58,7 +70,12 @@ func (s *Server) ReadLoop(conn net.Conn) {
 			continue
 		}
 
-		fmt.Println(string(buf[:n]))
+		msg := Message{
+			from: conn.RemoteAddr().String(),
+			msg:  string(buf[:n]),
+		}
+
+		s.messages <- msg
 	}
 }
 
