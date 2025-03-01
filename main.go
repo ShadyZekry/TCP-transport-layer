@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
+	"strings"
 )
 
 type Message struct {
@@ -14,14 +16,12 @@ type Server struct {
 	ListenAddr string
 	ln         net.Listener
 	messages   chan Message
-	closeChan  chan struct{}
 }
 
 func NewServer(listenAddr string) *Server {
 	return &Server{
 		ListenAddr: listenAddr,
 		messages:   make(chan Message),
-		closeChan:  make(chan struct{}),
 	}
 }
 
@@ -38,12 +38,11 @@ func (s *Server) Serve() error {
 	go s.AcceptConnections()
 	for {
 		msg := <-s.messages
-		fmt.Println("from: ", msg.from, " msg: ", msg.msg)
+		if len(strings.TrimSpace(msg.msg)) == 0 {
+			msg.msg = "<empty>\n"
+		}
+		fmt.Print("from: ", msg.from, " msg: ", msg.msg)
 	}
-
-	<-s.closeChan
-	close(s.closeChan)
-	return nil
 }
 
 func (s *Server) AcceptConnections() {
@@ -65,7 +64,13 @@ func (s *Server) ReadLoop(conn net.Conn) {
 	for {
 		buf := make([]byte, 1024)
 		n, err := conn.Read(buf)
-		if err != nil {
+
+		switch err {
+		case nil:
+		case io.EOF:
+			fmt.Println("closed connection: ", conn.RemoteAddr())
+			return
+		default:
 			fmt.Println("read error: ", err)
 			continue
 		}
